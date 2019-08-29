@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yuin/gopher-lua/ast"
+	"github.com/scax/gopher-lua/ast"
 	"io"
 	"reflect"
 	"strconv"
@@ -363,28 +363,42 @@ redo:
 				tok.Str = string(ch)
 			}
 		case '~':
-			if sc.Peek() == '=' {
+			switch sc.Peek() {
+			case '=':
 				tok.Type = TNeq
 				tok.Str = "~="
 				sc.Next()
-			} else {
-				err = sc.Error("~", "Invalid '~' token")
+			default:
+
+				tok.Type = ch
+				tok.Str = string(ch)
 			}
 		case '<':
-			if sc.Peek() == '=' {
+
+			switch sc.Peek() {
+			case '=':
 				tok.Type = TLte
 				tok.Str = "<="
 				sc.Next()
-			} else {
+			case '<':
+				tok.Type = TLshift
+				tok.Str = "<<"
+				sc.Next()
+			default:
 				tok.Type = ch
 				tok.Str = string(ch)
 			}
 		case '>':
-			if sc.Peek() == '=' {
+			switch sc.Peek() {
+			case '=':
 				tok.Type = TGte
 				tok.Str = ">="
 				sc.Next()
-			} else {
+			case '>':
+				tok.Type = TRshift
+				tok.Str = ">>"
+				sc.Next()
+			default:
 				tok.Type = ch
 				tok.Str = string(ch)
 			}
@@ -408,7 +422,7 @@ redo:
 				tok.Type = '.'
 			}
 			tok.Str = buf.String()
-		case '+', '*', '/', '%', '^', '#', '(', ')', '{', '}', ']', ';', ':', ',':
+		case '+', '*', '/', '%', '^', '#', '(', ')', '{', '}', ']', ';', ':', ',', '&', '|':
 			tok.Type = ch
 			tok.Str = string(ch)
 		default:

@@ -96,8 +96,16 @@ const (
 	OP_VARARG /*     A B     R(A) R(A+1) ... R(A+B-1) = vararg            */
 
 	OP_NOP /* NOP */
+
+	OP_BAND
+	OP_BOR
+	OP_BXOR
+	OP_BLSHIFT
+	OP_BRSHIFT
+
+	OP_UBN
 )
-const opCodeMax = OP_NOP
+const opCodeMax = OP_UBN
 
 type opArgMode int
 
@@ -168,6 +176,13 @@ var opProps = []opProp{
 	opProp{"CLOSURE", false, true, opArgModeU, opArgModeN, opTypeABx},
 	opProp{"VARARG", false, true, opArgModeU, opArgModeN, opTypeABC},
 	opProp{"NOP", false, false, opArgModeR, opArgModeN, opTypeASbx},
+
+	opProp{"BAND", false, true, opArgModeK, opArgModeK, opTypeABC},
+	opProp{"BOR", false, true, opArgModeK, opArgModeK, opTypeABC},
+	opProp{"BXOR", false, true, opArgModeK, opArgModeK, opTypeABC},
+	opProp{"BLSHIFT", false, true, opArgModeK, opArgModeK, opTypeABC},
+	opProp{"BRSHIFT", false, true, opArgModeK, opArgModeK, opTypeABC},
+	opProp{"UBN", false, true, opArgModeR, opArgModeN, opTypeABC},
 }
 
 func opGetOpCode(inst uint32) int {
@@ -366,6 +381,20 @@ func opToString(inst uint32) string {
 		buf += fmt.Sprintf(";  R(%v) R(%v+1) ... R(%v+%v-1) = vararg", arga, arga, arga, argb)
 	case OP_NOP:
 		/* nothing to do */
+	case OP_BAND:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
+	case OP_BOR:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
+	case OP_BXOR:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
+	case OP_BLSHIFT:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
+	case OP_BRSHIFT:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
+	case OP_UBN:
+		buf += fmt.Sprintf("; R(%v) := ~R(%v)", arga, argb)
+	default:
+		buf += ""
 	}
 	return buf
 }

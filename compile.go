@@ -2,7 +2,7 @@ package lua
 
 import (
 	"fmt"
-	"github.com/yuin/gopher-lua/ast"
+	"github.com/scax/gopher-lua/ast"
 	"math"
 	"reflect"
 )
@@ -134,7 +134,8 @@ func lnumberValue(expr ast.Expr) (LNumber, bool) {
 
 /* utilities }}} */
 
-type CompileError struct { // {{{
+type CompileError struct {
+	// {{{
 	context *funcContext
 	Line    int
 	Message string
@@ -144,7 +145,8 @@ func (e *CompileError) Error() string {
 	return fmt.Sprintf("compile error near line(%v) %v: %v", e.Line, e.context.Proto.SourceName, e.Message)
 } // }}}
 
-type codeStore struct { // {{{
+type codeStore struct {
+	// {{{
 	codes []uint32
 	lines []int
 	pc    int
@@ -1026,10 +1028,13 @@ func compileExpr(context *funcContext, reg int, expr ast.Expr, ec *expcontext) i
 	case *ast.ArithmeticOpExpr:
 		compileArithmeticOpExpr(context, reg, ex, ec)
 		return sused
+	case *ast.BitArithmeticOpExpr:
+		compileBitArithmeticOpExpr(context, reg, ex, ec)
+		return sused
 	case *ast.StringConcatOpExpr:
 		compileStringConcatOpExpr(context, reg, ex, ec)
 		return sused
-	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr:
+	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr, *ast.UnaryBitNotOpExpr:
 		compileUnaryOpExpr(context, reg, ex, ec)
 		return sused
 	case *ast.RelationalOpExpr:
@@ -1109,12 +1114,87 @@ func constFold(exp ast.Expr) ast.Expr { // {{{
 		} else {
 			return expr
 		}
+
+	case *ast.BitArithmeticOpExpr:
+		lvalue, lisconst := lnumberValue(constFold(expr.Lhs))
+		rvalue, risconst := lnumberValue(constFold(expr.Rhs))
+		if lisconst && risconst {
+			brvalue := int64(rvalue)
+			blvalue := int64(lvalue)
+
+			switch expr.Operator {
+			case "&":
+				return &constLValueExpr{Value: LNumber(brvalue & blvalue)}
+			case "|":
+				return &constLValueExpr{Value: LNumber(brvalue | blvalue)}
+			case "~":
+				return &constLValueExpr{Value: LNumber(brvalue ^ blvalue)}
+			case "<<":
+
+				if lvalue < 0 || rvalue < 0 {
+
+					if lvalue < 0 {
+						lvalue = -lvalue
+					}
+					if rvalue < 0 {
+						rvalue = -rvalue
+					}
+
+					ubrvalue := uint64(rvalue)
+					ublvalue := uint64(lvalue)
+
+					return &constLValueExpr{Value: LNumber(ublvalue >> ubrvalue)}
+
+				}
+
+				ubrvalue := uint64(rvalue)
+				ublvalue := uint64(lvalue)
+
+				return &constLValueExpr{Value: LNumber(ublvalue << ubrvalue)}
+			case ">>":
+				if lvalue < 0 || rvalue < 0 {
+
+					lvalue, rvalue = rvalue, lvalue
+
+					if lvalue < 0 {
+						lvalue = -lvalue
+					}
+					if rvalue < 0 {
+						rvalue = -rvalue
+					}
+
+					ubrvalue := uint64(rvalue)
+					ublvalue := uint64(lvalue)
+
+					return &constLValueExpr{Value: LNumber(ublvalue << ubrvalue)}
+
+				}
+
+				ubrvalue := uint64(rvalue)
+				ublvalue := uint64(lvalue)
+
+				return &constLValueExpr{Value: LNumber(ublvalue >> ubrvalue)}
+			default:
+				panic(fmt.Sprintf("unknown binop: %v", expr.Operator))
+			}
+		} else {
+			return expr
+		}
+
 	case *ast.UnaryMinusOpExpr:
 		expr.Expr = constFold(expr.Expr)
 		if value, ok := lnumberValue(expr.Expr); ok {
 			return &constLValueExpr{Value: LNumber(-value)}
 		}
 		return expr
+	case *ast.UnaryBitNotOpExpr:
+
+		expr.Expr = constFold(expr.Expr)
+		if value, ok := lnumberValue(expr.Expr); ok {
+			return &constLValueExpr{Value: LNumber(^int64(value))}
+		}
+		return expr
+
 	default:
 
 		return exp
@@ -1234,6 +1314,37 @@ func compileTableExpr(context *funcContext, reg int, ex *ast.TableExpr, ec *expc
 	}
 } // }}}
 
+func compileBitArithmeticOpExpr(context *funcContext, reg int, expr *ast.BitArithmeticOpExpr, ec *expcontext) { // {{{
+	exp := constFold(expr)
+	if ex, ok := exp.(*constLValueExpr); ok {
+		exp.SetLine(sline(expr))
+		compileExpr(context, reg, ex, ec)
+		return
+	}
+	expr, _ = exp.(*ast.BitArithmeticOpExpr)
+	a := savereg(ec, reg)
+	b := reg
+	compileExprWithKMVPropagation(context, expr.Lhs, &reg, &b)
+	c := reg
+	compileExprWithKMVPropagation(context, expr.Rhs, &reg, &c)
+
+	op := 0
+	switch expr.Operator {
+	case "&":
+		op = OP_BAND
+	case "|":
+		op = OP_BOR
+	case ">>":
+		op = OP_BRSHIFT
+	case "<<":
+		op = OP_BLSHIFT
+	case "~":
+		op = OP_BXOR
+
+	}
+	context.Code.AddABC(op, a, b, c, sline(expr))
+} // }}}
+
 func compileArithmeticOpExpr(context *funcContext, reg int, expr *ast.ArithmeticOpExpr, ec *expcontext) { // {{{
 	exp := constFold(expr)
 	if ex, ok := exp.(*constLValueExpr); ok {
@@ -1317,6 +1428,16 @@ func compileUnaryOpExpr(context *funcContext, reg int, expr ast.Expr, ec *expcon
 	case *ast.UnaryLenOpExpr:
 		opcode = OP_LEN
 		operandexpr = ex.Expr
+	case *ast.UnaryBitNotOpExpr:
+		exp := constFold(ex)
+		if lvexpr, ok := exp.(*constLValueExpr); ok {
+			exp.SetLine(sline(expr))
+			compileExpr(context, reg, lvexpr, ec)
+			return
+		}
+		ex, _ = exp.(*ast.UnaryBitNotOpExpr)
+		operandexpr = ex.Expr
+		opcode = OP_UBN
 	}
 
 	a := savereg(ec, reg)

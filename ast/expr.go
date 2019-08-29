@@ -114,12 +114,23 @@ type ArithmeticOpExpr struct {
 	Rhs      Expr
 }
 
+type BitArithmeticOpExpr struct {
+	ExprBase
+
+	Operator string
+	Lhs      Expr
+	Rhs      Expr
+}
 type UnaryMinusOpExpr struct {
 	ExprBase
 	Expr Expr
 }
 
 type UnaryNotOpExpr struct {
+	ExprBase
+	Expr Expr
+}
+type UnaryBitNotOpExpr struct {
 	ExprBase
 	Expr Expr
 }

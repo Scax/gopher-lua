@@ -2,7 +2,7 @@
 package parse
 
 import (
-  "github.com/yuin/gopher-lua/ast"
+  "github.com/scax/gopher-lua/ast"
 )
 %}
 %type<stmts> chunk
@@ -55,7 +55,7 @@ import (
 %token<token> TAnd TBreak TDo TElse TElseIf TEnd TFalse TFor TFunction TIf TIn TLocal TNil TNot TOr TReturn TRepeat TThen TTrue TUntil TWhile 
 
 /* Literals */
-%token<token> TEqeq TNeq TLte TGte T2Comma T3Comma TIdent TNumber TString '{' '('
+%token<token> TEqeq TNeq TLte TGte T2Comma T3Comma TIdent TNumber TString '{' '(' TRshift TLshift
 
 /* Operators */
 %left TOr
@@ -64,8 +64,9 @@ import (
 %right T2Comma
 %left '+' '-'
 %left '*' '/' '%'
-%right UNARY /* not # -(unary) */
+%right UNARY /* not # - ~(unary) */
 %right '^'
+%left '&' '|' '~' TRshift TLshift
 
 %%
 
@@ -377,7 +378,32 @@ expr:
         '#' expr %prec UNARY {
             $$ = &ast.UnaryLenOpExpr{Expr: $2}
             $$.SetLine($2.Line())
-        }
+        } |
+        expr '&' expr {
+                    $$ = &ast.BitArithmeticOpExpr{Lhs: $1, Operator: "&", Rhs: $3}
+                    $$.SetLine($1.Line())
+                } |
+        expr '|' expr {
+                    $$ = &ast.BitArithmeticOpExpr{Lhs: $1, Operator: "|", Rhs: $3}
+                    $$.SetLine($1.Line())
+                } |
+        expr '~' expr {
+                    $$ = &ast.BitArithmeticOpExpr{Lhs: $1, Operator: "~", Rhs: $3}
+                    $$.SetLine($1.Line())
+                } |
+	expr TLshift expr {
+			    $$ = &ast.BitArithmeticOpExpr{Lhs: $1, Operator: "<<", Rhs: $3}
+			    $$.SetLine($1.Line())
+			} |
+        expr TRshift expr {
+                    $$ = &ast.BitArithmeticOpExpr{Lhs: $1, Operator: ">>", Rhs: $3}
+                    $$.SetLine($1.Line())
+                } |
+
+	'~' expr %prec UNARY {
+	     $$ = &ast.UnaryBitNotOpExpr{Expr: $2}
+	     $$.SetLine($2.Line())
+	}
 
 string: 
         TString {

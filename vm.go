@@ -1352,6 +1352,40 @@ func init() {
 		func(L *LState, inst uint32, baseframe *callFrame) int { //OP_NOP
 			return 0
 		},
+		opBitArith, //OP_BAND
+		opBitArith, //OP_BOR
+		opBitArith, //OP_BXOR
+		opBitArith, //OP_BLSHIFT
+		opBitArith, //OP_BRSHIFT
+		func(L *LState, inst uint32, baseframe *callFrame) int { //OP_UBN
+			reg := L.reg
+			cf := L.currentFrame
+			lbase := cf.LocalBase
+			A := int(inst>>18) & 0xff //GETA
+			RA := lbase + A
+			B := int(inst & 0x1ff) //GETB
+			unaryv := L.rkValue(B)
+			if nm, ok := unaryv.(LNumber); ok {
+				reg.SetNumber(RA, LNumber(^int64(nm)))
+			} else {
+				op := L.metaOp1(unaryv, "__ubn")
+				if op.Type() == LTFunction {
+					reg.Push(op)
+					reg.Push(unaryv)
+					L.Call(1, 1)
+					reg.Set(RA, reg.Pop())
+				} else if str, ok1 := unaryv.(LString); ok1 {
+					if num, err := parseNumber(string(str)); err == nil {
+						reg.Set(RA, LNumber(^int64(num)))
+					} else {
+						L.RaiseError("__ubn undefined")
+					}
+				} else {
+					L.RaiseError("__ubn undefined")
+				}
+			}
+			return 0
+		},
 	}
 }
 
@@ -1372,6 +1406,27 @@ func opArith(L *LState, inst uint32, baseframe *callFrame) int { //OP_ADD, OP_SU
 		reg.SetNumber(RA, numberArith(L, opcode, LNumber(v1), LNumber(v2)))
 	} else {
 		reg.Set(RA, objectArith(L, opcode, lhs, rhs))
+	}
+	return 0
+}
+
+func opBitArith(L *LState, inst uint32, baseframe *callFrame) int { //OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW
+	reg := L.reg
+	cf := L.currentFrame
+	lbase := cf.LocalBase
+	A := int(inst>>18) & 0xff //GETA
+	RA := lbase + A
+	opcode := int(inst >> 26) //GETOPCODE
+	B := int(inst & 0x1ff)    //GETB
+	C := int(inst>>9) & 0x1ff //GETC
+	lhs := L.rkValue(B)
+	rhs := L.rkValue(C)
+	v1, ok1 := lhs.assertFloat64()
+	v2, ok2 := rhs.assertFloat64()
+	if ok1 && ok2 {
+		reg.SetNumber(RA, bitArith(L, opcode, LNumber(v1), LNumber(v2)))
+	} else {
+		reg.Set(RA, objectBitArith(L, opcode, lhs, rhs))
 	}
 	return 0
 }
@@ -1398,6 +1453,52 @@ func numberArith(L *LState, opcode int, lhs, rhs LNumber) LNumber {
 		return lhs / rhs
 	case OP_MOD:
 		return luaModulo(lhs, rhs)
+	case OP_POW:
+		flhs := float64(lhs)
+		frhs := float64(rhs)
+		return LNumber(math.Pow(flhs, frhs))
+	}
+	panic("should not reach here")
+	return LNumber(0)
+}
+
+func bitArith(L *LState, opcode int, lhs, rhs LNumber) LNumber {
+	switch opcode {
+	case OP_BAND:
+		return LNumber(int64(lhs) & int64(rhs))
+	case OP_BOR:
+		return LNumber(int64(lhs) | int64(rhs))
+	case OP_BXOR:
+		return LNumber(int64(lhs) ^ int64(rhs))
+	case OP_BLSHIFT:
+
+		if lhs < 0 || rhs < 0 {
+
+			if lhs < 0 {
+				lhs = -lhs
+			}
+			if rhs < 0 {
+				rhs = -rhs
+			}
+			return LNumber(uint64(lhs) >> uint64(rhs))
+
+		}
+
+		return LNumber(uint64(lhs) << uint64(rhs))
+	case OP_BRSHIFT:
+		if lhs < 0 || rhs < 0 {
+
+			if lhs < 0 {
+				lhs = -lhs
+			}
+			if rhs < 0 {
+				rhs = -rhs
+			}
+			return LNumber(uint64(lhs) << uint64(rhs))
+
+		}
+
+		return LNumber(uint64(lhs) >> uint64(rhs))
 	case OP_POW:
 		flhs := float64(lhs)
 		frhs := float64(rhs)
@@ -1444,6 +1545,49 @@ func objectArith(L *LState, opcode int, lhs, rhs LValue) LValue {
 	if v1, ok1 := lhs.assertFloat64(); ok1 {
 		if v2, ok2 := rhs.assertFloat64(); ok2 {
 			return numberArith(L, opcode, LNumber(v1), LNumber(v2))
+		}
+	}
+	L.RaiseError(fmt.Sprintf("cannot perform %v operation between %v and %v",
+		strings.TrimLeft(event, "_"), lhs.Type().String(), rhs.Type().String()))
+
+	return LNil
+}
+func objectBitArith(L *LState, opcode int, lhs, rhs LValue) LValue {
+	event := ""
+	switch opcode {
+	case OP_BAND:
+		event = "__band"
+	case OP_BOR:
+		event = "__bor"
+	case OP_BXOR:
+		event = "__bxor"
+	case OP_BLSHIFT:
+		event = "__shr"
+	case OP_BRSHIFT:
+		event = "__shl"
+
+	}
+	op := L.metaOp2(lhs, rhs, event)
+	if op.Type() == LTFunction {
+		L.reg.Push(op)
+		L.reg.Push(lhs)
+		L.reg.Push(rhs)
+		L.Call(2, 1)
+		return L.reg.Pop()
+	}
+	if str, ok := lhs.(LString); ok {
+		if lnum, err := parseNumber(string(str)); err == nil {
+			lhs = lnum
+		}
+	}
+	if str, ok := rhs.(LString); ok {
+		if rnum, err := parseNumber(string(str)); err == nil {
+			rhs = rnum
+		}
+	}
+	if v1, ok1 := lhs.assertFloat64(); ok1 {
+		if v2, ok2 := rhs.assertFloat64(); ok2 {
+			return bitArith(L, opcode, LNumber(v1), LNumber(v2))
 		}
 	}
 	L.RaiseError(fmt.Sprintf("cannot perform %v operation between %v and %v",

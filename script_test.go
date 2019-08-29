@@ -2,7 +2,7 @@ package lua
 
 import (
 	"fmt"
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/scax/gopher-lua/parse"
 	"os"
 	"testing"
 )
@@ -35,6 +35,9 @@ var luaTests []string = []string{
 	"vararg.lua",
 	"pm.lua",
 	"files.lua",
+}
+var luaTestBinOp = []string{
+	"binop.lua",
 }
 
 func testScriptCompile(t *testing.T, script string) {
@@ -85,4 +88,7 @@ func TestGlua(t *testing.T) {
 
 func TestLua(t *testing.T) {
 	testScriptDir(t, luaTests, "_lua5.1-tests")
+}
+func TestLuaBinOp(t *testing.T) {
+	testScriptDir(t, luaTestBinOp, "_lua5.1-tests")
 }
