@@ -1,4 +1,4 @@
-module github.com/yuin/gopher-lua
+module github.com/scax/gopher-lua
 
 require (
 	github.com/chzyer/logex v1.1.10 // indirect
