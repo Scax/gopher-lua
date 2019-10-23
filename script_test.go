@@ -36,8 +36,9 @@ var luaTests []string = []string{
 	"pm.lua",
 	"files.lua",
 }
-var luaTestBinOp = []string{
+var luaTest53Addition = []string{
 	"binop.lua",
+	"floordiv.lua",
 }
 
 func testScriptCompile(t *testing.T, script string) {
@@ -89,6 +90,6 @@ func TestGlua(t *testing.T) {
 func TestLua(t *testing.T) {
 	testScriptDir(t, luaTests, "_lua5.1-tests")
 }
-func TestLuaBinOp(t *testing.T) {
-	testScriptDir(t, luaTestBinOp, "_lua5.1-tests")
+func Test53Addition(t *testing.T) {
+	testScriptDir(t, luaTest53Addition, "_lua5.1-tests")
 }
