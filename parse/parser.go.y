@@ -55,7 +55,7 @@ import (
 %token<token> TAnd TBreak TDo TElse TElseIf TEnd TFalse TFor TFunction TIf TIn TLocal TNil TNot TOr TReturn TRepeat TThen TTrue TUntil TWhile 
 
 /* Literals */
-%token<token> TEqeq TNeq TLte TGte T2Comma T3Comma TIdent TNumber TString '{' '(' TRshift TLshift
+%token<token> TEqeq TNeq TLte TGte T2Comma T3Comma TIdent TNumber TString '{' '(' TRshift TLshift TFloorDiv
 
 /* Operators */
 %left TOr
@@ -63,7 +63,7 @@ import (
 %left '>' '<' TGte TLte TEqeq TNeq
 %right T2Comma
 %left '+' '-'
-%left '*' '/' '%'
+%left '*' '/' '%' TFloorDiv
 %right UNARY /* not # - ~(unary) */
 %right '^'
 %left '&' '|' '~' TRshift TLshift
@@ -359,6 +359,12 @@ expr:
             $$ = &ast.ArithmeticOpExpr{Lhs: $1, Operator: "/", Rhs: $3}
             $$.SetLine($1.Line())
         } |
+
+        expr TFloorDiv expr {
+                    $$ = &ast.ArithmeticOpExpr{Lhs: $1, Operator: "//", Rhs: $3}
+                    $$.SetLine($1.Line())
+        } |
+
         expr '%' expr {
             $$ = &ast.ArithmeticOpExpr{Lhs: $1, Operator: "%", Rhs: $3}
             $$.SetLine($1.Line())

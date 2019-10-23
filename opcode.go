@@ -104,8 +104,10 @@ const (
 	OP_BRSHIFT
 
 	OP_UBN
+
+	OP_FLOORDIV
 )
-const opCodeMax = OP_UBN
+const opCodeMax = OP_FLOORDIV
 
 type opArgMode int
 
@@ -183,6 +185,8 @@ var opProps = []opProp{
 	opProp{"BLSHIFT", false, true, opArgModeK, opArgModeK, opTypeABC},
 	opProp{"BRSHIFT", false, true, opArgModeK, opArgModeK, opTypeABC},
 	opProp{"UBN", false, true, opArgModeR, opArgModeN, opTypeABC},
+
+	opProp{"FLOORDIV", false, true, opArgModeK, opArgModeK, opTypeABC},
 }
 
 func opGetOpCode(inst uint32) int {
@@ -393,6 +397,8 @@ func opToString(inst uint32) string {
 		buf += fmt.Sprintf("; R(%v) := RK(%v) & RK(%v)", arga, argb, argc)
 	case OP_UBN:
 		buf += fmt.Sprintf("; R(%v) := ~R(%v)", arga, argb)
+	case OP_FLOORDIV:
+		buf += fmt.Sprintf("; R(%v) := RK(%v) // RK(%v)", arga, argb, argc)
 	default:
 		buf += ""
 	}

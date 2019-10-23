@@ -422,7 +422,17 @@ redo:
 				tok.Type = '.'
 			}
 			tok.Str = buf.String()
-		case '+', '*', '/', '%', '^', '#', '(', ')', '{', '}', ']', ';', ':', ',', '&', '|':
+		case '/':
+			switch sc.Peek() {
+			case '/':
+				tok.Type = TFloorDiv
+				tok.Str = "//"
+				sc.Next()
+			default:
+				tok.Type = ch
+				tok.Str = string(ch)
+			}
+		case '+', '*', '%', '^', '#', '(', ')', '{', '}', ']', ';', ':', ',', '&', '|':
 			tok.Type = ch
 			tok.Str = string(ch)
 		default:

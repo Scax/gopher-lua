@@ -1108,6 +1108,8 @@ func constFold(exp ast.Expr) ast.Expr { // {{{
 				return &constLValueExpr{Value: luaModulo(lvalue, rvalue)}
 			case "^":
 				return &constLValueExpr{Value: LNumber(math.Pow(float64(lvalue), float64(rvalue)))}
+			case "//":
+				return &constLValueExpr{Value: LNumber(math.Floor(float64(lvalue) / float64(rvalue)))}
 			default:
 				panic(fmt.Sprintf("unknown binop: %v", expr.Operator))
 			}
@@ -1373,6 +1375,8 @@ func compileArithmeticOpExpr(context *funcContext, reg int, expr *ast.Arithmetic
 		op = OP_MOD
 	case "^":
 		op = OP_POW
+	case "//":
+		op = OP_FLOORDIV
 	}
 	context.Code.AddABC(op, a, b, c, sline(expr))
 } // }}}
