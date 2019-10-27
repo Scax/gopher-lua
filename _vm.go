@@ -839,6 +839,7 @@ func init() {
 			}
 			return 0
 		},
+		opArith, // OP_FLOORDIV
 	}
 }
 
@@ -910,6 +911,8 @@ func numberArith(L *LState, opcode int, lhs, rhs LNumber) LNumber {
 		flhs := float64(lhs)
 		frhs := float64(rhs)
 		return LNumber(math.Pow(flhs, frhs))
+	case OP_FLOORDIV:
+		return LNumber(math.Floor(float64(lhs) / float64(rhs)))
 	}
 	panic("should not reach here")
 	return LNumber(0)
@@ -976,6 +979,8 @@ func objectArith(L *LState, opcode int, lhs, rhs LValue) LValue {
 		event = "__mod"
 	case OP_POW:
 		event = "__pow"
+	case OP_FLOORDIV:
+		event = "__idiv"
 	}
 	op := L.metaOp2(lhs, rhs, event)
 	if op.Type() == LTFunction {
